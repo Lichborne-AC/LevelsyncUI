@@ -4,7 +4,7 @@ A World of Warcraft addon (WotLK 3.3.5a) that provides a graphical UI for [mod-l
 
 ## Overview
 
-LevelSync lets you view and manage your sync group directly from an in-game panel — no need to type `.levelsync` commands manually. It displays all accounts and characters in your sync group in a clean 3×2 grid, with class colors, IP tier progression, and live status updates.
+LevelSync provides a graphical interface that lets you view your levelsync group directly from an in-game panel. It displays all accounts and characters in your sync group in a clean 3×2 grid, with levels, class (in colors), and IP tier progression.
 
 ## Features
 
@@ -27,8 +27,6 @@ LevelSync lets you view and manage your sync group directly from an in-game pane
    World of Warcraft/Interface/AddOns/LevelSync/
    ```
 3. Launch WoW and enable **LevelSync** on the addon selection screen
-4. Log in — the minimap icon will appear
-
 
 ## IP Tier Reference
 
