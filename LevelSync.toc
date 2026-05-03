@@ -1,0 +1,13 @@
+## Interface: 30300
+## Title: LevelSync
+## Notes: Graphical UI for mod-levelsync on AzerothCore (WotLK 3.3.5a)
+## Author: LevelSync
+## Version: 1.0.0
+## SavedVariables: LevelSyncDB
+
+libs\LibStub\LibStub.lua
+libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+LevelSync.lua
+LevelSync_UI.lua
