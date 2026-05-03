@@ -1,6 +1,6 @@
 # LevelSyncUI
 
-A World of Warcraft addon (WotLK 3.3.5a) that provides a graphical UI for [mod-levelsync](https://github.com/azerothcore/mod-levelsync) on AzerothCore private servers.
+A World of Warcraft addon (WotLK 3.3.5a, Azerothcore) that provides a graphical UI for [mod-levelsync](https://github.com/azerothcore/mod-levelsync).
 
 ## Overview
 
