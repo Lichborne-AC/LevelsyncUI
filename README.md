@@ -67,6 +67,6 @@ LevelSync/
 
 ## Compatibility
 
-- WoW 3.3.5a (Interface 30300) only
+- WoW 3.3.5a
 - Requires mod-levelsync on the server side
-- No external dependencies beyond the bundled libraries
+
