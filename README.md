@@ -17,7 +17,7 @@ LevelSync provides a graphical interface that lets you view your levelsync group
 ## Requirements
 
 - AzerothCore private server with [mod-levelsync](https://github.com/Lichborne-AC/mod-levelsync) installed
-- WoW client version 3.3.5a (patch 12340)
+- WoW client version 3.3.5a 
 
 ## Installation
 
