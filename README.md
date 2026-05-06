@@ -12,7 +12,6 @@ LevelSync provides a graphical interface that lets you view your levelsync group
 - **Class-colored character names** — each class displays in its official color
 - **IP tier progression** — color-coded by tier (Molten Core through Ruby Sanctum)
 - **Slash command reference** — all `.levelsync` commands listed directly in the panel
-- **Minimap icon** — draggable, position saved between sessions
 
 ## Requirements
 

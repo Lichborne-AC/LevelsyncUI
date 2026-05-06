@@ -51,6 +51,7 @@ LS.data = {
     groupId        = nil,
     accountsCur    = 0,
     accountsMax    = 0,
+    totalChars     = 0,
     levelSync      = false,
     ipSync         = false,
     ipSyncDisabled = false,
@@ -75,19 +76,6 @@ end
 
 LS.SendCmd = SendCmd
 
--- ─── Delay helpers (OnUpdate-based; WoW 3.3.5a has no C_Timer) ──────────────
-
-local function DelayCall(seconds, func)
-    local f = CreateFrame("Frame")
-    local t = seconds
-    f:SetScript("OnUpdate", function(self, elapsed)
-        t = t - elapsed
-        if t <= 0 then
-            self:SetScript("OnUpdate", nil)
-            func()
-        end
-    end)
-end
 
 -- ─── Multi-line status state machine ─────────────────────────────────────────
 -- Captures ALL CHAT_MSG_SYSTEM lines while sm.active is true, then commits
@@ -117,6 +105,7 @@ local function CommitStatus()
     d.groupId     = nil
     d.accountsCur = 0
     d.accountsMax = 0
+    d.totalChars  = 0
     d.levelSync   = false
     d.ipSync      = false
     d.members     = {}
@@ -138,12 +127,16 @@ local function CommitStatus()
             d.accountsMax = tonumber(max)
         end
 
+        -- "  Total Characters: N"
+        local tc = line:match("Total Characters: (%d+)")
+        if tc then d.totalChars = tonumber(tc) end
+
         -- "  Level sync: ON|OFF"
-        local ls = line:match("Level sync: (ON|OFF)")
+        local ls = line:match("Level sync: (%u+)")
         if ls then d.levelSync = (ls == "ON") end
 
         -- "  Progression sync: ON|OFF"
-        local ps = line:match("Progression sync: (ON|OFF)")
+        local ps = line:match("Progression sync: (%u+)")
         if ps then d.ipSync = (ps == "ON") end
 
         -- "  Account N: Characters: X" — extract account ID
@@ -202,32 +195,16 @@ listener:SetScript("OnEvent", function(self, event, msg)
     -- Outside a status block, only act on [LevelSync] messages
     if not clean:find("%[LevelSync%]") then return end
 
-    -- ── Passive notifications → re-request status after a short delay ──
-    if clean:find("has been updated to") then
-        DelayCall(0.5, function() SendCmd("status") end)
-        return
-    end
-    if clean:find("has been disbanded") then
-        LS.data.inGroup = false
-        if LS.UI_OnDataRefresh then LS.UI_OnDataRefresh() end
-        DelayCall(0.5, function() SendCmd("status") end)
-        return
-    end
-    if clean:find("has been removed from the sync group") then
-        DelayCall(0.5, function() SendCmd("status") end)
-        return
-    end
-
-    -- ── Server has IP/progression sync disabled ──
-    if clean:find("Progression sync is disabled by the server") then
-        LS.data.ipSyncDisabled = true
-        if LS.UI_OnIPSyncDisabled then LS.UI_OnIPSyncDisabled() end
-        return
-    end
-
-    -- ── Not in a group (reactive, e.g. another player disbanded) ──
-    if clean:find("You are not in a sync group") then
-        LS.data.inGroup = false
+    -- ── No group — wipe all data ──
+    if clean:find("Sync group disbanded") or clean:find("You are not in a sync group") then
+        LS.data.inGroup     = false
+        LS.data.groupId     = nil
+        LS.data.accountsCur = 0
+        LS.data.accountsMax = 0
+        LS.data.totalChars  = 0
+        LS.data.levelSync   = false
+        LS.data.ipSync      = false
+        LS.data.members     = {}
         if LS.UI_OnDataRefresh then LS.UI_OnDataRefresh() end
         return
     end
@@ -240,9 +217,31 @@ listener:SetScript("OnEvent", function(self, event, msg)
         return
     end
 
-    -- ── Anything else: print as a notification ──
-    if LS.UI_OnNotification then LS.UI_OnNotification(clean) end
 end)
+
+-- ─── Status output filter ────────────────────────────────────────────────────
+-- Suppresses the status block from appearing in the chat frame.
+-- Our event listener still captures every line for parsing — it just won't print.
+
+local function LevelSyncStatusFilter(_, _, msg)
+    local clean = msg:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+
+    if sm.active then
+        -- Untagged lines are pure status data (Accounts:, character rows, etc.) — suppress
+        if not clean:find("%[LevelSync%]") then return true end
+        -- Known status header lines that carry [LevelSync] — suppress
+        if clean:find("Sync Group #") or clean:find("Group members") then return true end
+        -- Any other [LevelSync] message (confirmations, errors) — let through
+        return
+    end
+
+    -- Catch the trigger line before sm.active is set (in case chat frame fires first)
+    if clean:find("%[LevelSync%]") and clean:find("Sync Group #") then
+        return true
+    end
+end
+
+ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", LevelSyncStatusFilter)
 
 -- ─── Slash commands ───────────────────────────────────────────────────────────
 

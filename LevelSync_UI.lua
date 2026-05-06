@@ -34,9 +34,9 @@ local BD_CELL = {
 
 -- ─── Layout constants ────────────────────────────────────────────────────────
 
-local PANEL_W    = 640
-local CELL_W     = 200    -- (640 - 2*14 side margins - 2*6 gaps) / 3 = 200
-local CELL_H     = 152    -- col-header + sep + 10 rows*12px + padding
+local PANEL_W    = 784
+local CELL_W     = 248    -- (784 - 2*14 side margins - 2*6 gaps) / 3 = 248
+local CELL_H     = 169    -- account row + sep + col-header + sep + 10 rows*12px + padding
 local SLOT_COUNT = 10     -- max chars per account cell
 local ROW_H      = 12
 local GRID_COLS  = 3
@@ -44,8 +44,8 @@ local GRID_ROWS  = 2
 local CELL_GAP   = 6
 local MARGIN     = 14
 local GRID_TOP   = -52    -- y from panel TOPLEFT
-local HDR_H      = 14     -- account name height above each cell
-local HDR_GAP    = 3      -- gap between account name and cell top
+local HDR_H      = 0      -- account name is now inside the cell
+local HDR_GAP    = 0
 
 -- Derived: where does the grid end?
 local GRID_END   = GRID_TOP - GRID_ROWS * (HDR_H + HDR_GAP + CELL_H) - (GRID_ROWS - 1) * CELL_GAP
@@ -55,23 +55,26 @@ local GRID_END   = GRID_TOP - GRID_ROWS * (HDR_H + HDR_GAP + CELL_H) - (GRID_ROW
 -- Both .levelsync and /lsync work as the prefix for every command.
 -- sub = the part after the prefix (shared by both .levelsync and /lsync)
 local CMDS = {
-    { sub = "setkey <key>",          desc = "Set your account security key" },
-    { sub = "addaccount <acct> [key]", desc = "Link all characters from another account" },
-    { sub = "addchar <name> [key]",  desc = "Link a single character into your group" },
-    { sub = "removeaccount <acct>",  desc = "Remove all characters of an account" },
-    { sub = "removechar <name>",     desc = "Remove one character from your group" },
-    { sub = "removeall",             desc = "Disband your sync group and clear all keys" },
-    { sub = "listaccount <acct>",    desc = "List all characters on an account" },
-    { sub = "status",                desc = "Show full group summary and all members" },
-    { sub = "level on|off",          desc = "Toggle level synchronization for the group" },
-    { sub = "IP on|off",             desc = "Toggle progression (IP tier) sync for the group" },
+    { sub = "setkey <key>",              desc = "Set your account security key" },
+    { sub = "addaccount <acct> [key]",   desc = "Link all characters from another account" },
+    { sub = "addchar <name> [key]",      desc = "Link a single character into your group" },
+    { sub = "removeaccount <acct>",      desc = "Remove all characters of an account" },
+    { sub = "removeaccount # <acct#>",  desc = "Remove an account by its group number" },
+    { sub = "removechar <name>",         desc = "Remove one character from your group" },
+    { sub = "removeall",                 desc = "Disband your sync group" },
+    { sub = "disbandaccount",            desc = "Disband all groups tied to your account" },
+    { sub = "listaccount <acct> [key]",  desc = "List all characters on an account" },
+    { sub = "status",                    desc = "Show full group summary and all members" },
+    { sub = "level on|off",              desc = "Toggle level synchronization for the group" },
+    { sub = "IP on|off",                 desc = "Toggle progression (IP tier) sync for the group" },
 }
--- 2 columns of 5 entries. Each entry = 2 lines: .levelsync cmd + description.
-local CMD_ENTRY_H = 32   -- 14px cmd + 14px desc + 4px gap
-local CMD_COLS    = 2
-local CMD_COL_W   = (PANEL_W - MARGIN * 2) / CMD_COLS  -- 306px each
+-- 2 columns (6 left, 5 right). Each entry = 2 lines: .levelsync cmd + description.
+local CMD_ENTRY_H  = 32   -- 14px cmd + 14px desc + 4px gap
+local CMD_COLS     = 2
+local CMD_COL_W    = (PANEL_W - MARGIN * 2) / CMD_COLS  -- 306px each
+local CMD_COL_SPLIT = 6   -- entries 1-6 in left col, 7-11 in right col
 -- Panel height
-PANEL_H = 650
+PANEL_H = 680
 
 -- ─── Tier short display strings ─────────────────────────────────────────────
 
@@ -80,21 +83,21 @@ local TIER_SHORT = {
     [1]  = "1 - Molten Core",
     [2]  = "2 - Onyxia",
     [3]  = "3 - Blackwing Lair",
-    [4]  = "4 - Pre-AQ",
+    [4]  = "4 - Pre-Ahn'Qiraj",
     [5]  = "5 - AQ War Effort",
     [6]  = "6 - Ahn'Qiraj",
     [7]  = "7 - Naxxramas",
     [8]  = "8 - Pre-TBC",
     [9]  = "9 - Kara/Gruul/Mag",
     [10] = "10 - SSC/TK",
-    [11] = "11 - Hyjal/BT",
-    [12] = "12 - ZA",
+    [11] = "11 - Hyjal/Black Temple",
+    [12] = "12 - Zul'Aman",
     [13] = "13 - Sunwell",
     [14] = "14 - Naxx/EoE",
     [15] = "15 - Ulduar",
-    [16] = "16 - ToC",
-    [17] = "17 - ICC",
-    [18] = "18 - Ruby Sanct.",
+    [16] = "16 - Trial of the Crusader",
+    [17] = "17 - Icecrown Citadel",
+    [18] = "18 - Ruby Sanctum",
 }
 
 -- ─── Tier text colors (hues match the Gear Tracker T0–T17 palette) ──────────
@@ -158,13 +161,6 @@ tinsert(UISpecialFrames, "LevelSyncMainFrame")
 
 -- ─── Title bar ───────────────────────────────────────────────────────────────
 
--- Decorative header background strip
-local titleBg = panel:CreateTexture(nil, "BACKGROUND")
-titleBg:SetPoint("TOPLEFT",  panel, "TOPLEFT",  3,  -3)
-titleBg:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -3, -3)
-titleBg:SetHeight(30)
-titleBg:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
-titleBg:SetVertexColor(0.08, 0.20, 0.42, 0.9)
 
 local titleFS = panel:CreateFontString(nil, "OVERLAY")
 titleFS:SetFont(FONT, 13, "OUTLINE")
@@ -198,29 +194,36 @@ for idx = 1, 6 do
     local row = math.floor((idx - 1) / GRID_COLS)
 
     local xOff     = MARGIN + col * (CELL_W + CELL_GAP)
-    local groupTop = GRID_TOP - row * (HDR_H + HDR_GAP + CELL_H + CELL_GAP)
-    local yCellOff = groupTop - HDR_H - HDR_GAP
+    local groupTop = GRID_TOP - row * (CELL_H + CELL_GAP)
 
-    -- Account name above cell (panel-level FontString)
-    local hdrFS = panel:CreateFontString(nil, "OVERLAY")
-    hdrFS:SetFont(FONT, 10, "OUTLINE")
-    hdrFS:SetPoint("TOPLEFT", panel, "TOPLEFT", xOff, groupTop)
-    hdrFS:SetWidth(CELL_W)
-    hdrFS:SetJustifyH("CENTER")
-    hdrFS:SetText("|cff444466— empty —|r")
-
-    -- Cell frame (below account name)
+    -- Cell frame (full height, account name lives inside)
     local cell = CreateFrame("Frame", nil, panel)
     cell:SetSize(CELL_W, CELL_H)
-    cell:SetPoint("TOPLEFT", panel, "TOPLEFT", xOff, yCellOff)
+    cell:SetPoint("TOPLEFT", panel, "TOPLEFT", xOff, groupTop)
     cell:SetBackdrop(BD_CELL)
     cell:SetBackdropColor(CBG_R, CBG_G, CBG_B, CBG_A)
     cell:SetBackdropBorderColor(CBDR_R, CBDR_G, CBDR_B, CBDR_A)
 
+    -- Account name row (inside cell)
+    local hdrFS = cell:CreateFontString(nil, "OVERLAY")
+    hdrFS:SetFont(FONT, 10, "OUTLINE")
+    hdrFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 2, -3)
+    hdrFS:SetWidth(CELL_W - 4)
+    hdrFS:SetJustifyH("CENTER")
+    hdrFS:SetTextColor(BDR_R, BDR_G, BDR_B)
+    hdrFS:SetText("— empty —")
+
+    -- Separator under account name
+    local acctSep = cell:CreateTexture(nil, "ARTWORK")
+    acctSep:SetHeight(1)
+    acctSep:SetPoint("TOPLEFT",  cell, "TOPLEFT",   3, -16)
+    acctSep:SetPoint("TOPRIGHT", cell, "TOPRIGHT", -3, -16)
+    acctSep:SetTexture(BDR_R, BDR_G, BDR_B, 0.55)
+
     -- Column headers: LvL | Character | Tier
     local colLvlFS = cell:CreateFontString(nil, "OVERLAY")
     colLvlFS:SetFont(FONT, 9, "OUTLINE")
-    colLvlFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 2, -5)
+    colLvlFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 2, -22)
     colLvlFS:SetWidth(20)
     colLvlFS:SetJustifyH("CENTER")
     colLvlFS:SetTextColor(BDR_R, BDR_G, BDR_B)
@@ -228,16 +231,16 @@ for idx = 1, 6 do
 
     local colCharFS = cell:CreateFontString(nil, "OVERLAY")
     colCharFS:SetFont(FONT, 9, "OUTLINE")
-    colCharFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 25, -5)
-    colCharFS:SetWidth(74)
+    colCharFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 25, -22)
+    colCharFS:SetWidth(84)
     colCharFS:SetJustifyH("LEFT")
     colCharFS:SetTextColor(BDR_R, BDR_G, BDR_B)
     colCharFS:SetText("Character")
 
     local colTierFS = cell:CreateFontString(nil, "OVERLAY")
     colTierFS:SetFont(FONT, 9, "OUTLINE")
-    colTierFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 102, -5)
-    colTierFS:SetWidth(CELL_W - 106)
+    colTierFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 112, -22)
+    colTierFS:SetWidth(114)
     colTierFS:SetJustifyH("LEFT")
     colTierFS:SetTextColor(BDR_R, BDR_G, BDR_B)
     colTierFS:SetText("Tier")
@@ -245,14 +248,14 @@ for idx = 1, 6 do
     -- Separator under column headers
     local hdrSep = cell:CreateTexture(nil, "ARTWORK")
     hdrSep:SetHeight(1)
-    hdrSep:SetPoint("TOPLEFT",  cell, "TOPLEFT",   3, -20)
-    hdrSep:SetPoint("TOPRIGHT", cell, "TOPRIGHT", -3, -20)
+    hdrSep:SetPoint("TOPLEFT",  cell, "TOPLEFT",   3, -37)
+    hdrSep:SetPoint("TOPRIGHT", cell, "TOPRIGHT", -3, -37)
     hdrSep:SetTexture(CBDR_R, CBDR_G, CBDR_B, 0.7)
 
     -- 10 character slots
     local rows = {}
     for r = 1, SLOT_COUNT do
-        local yRow = -(22 + (r - 1) * ROW_H)
+        local yRow = -(39 + (r - 1) * ROW_H)
 
         local lvlFS = cell:CreateFontString(nil, "OVERLAY")
         lvlFS:SetFont(FONT, 9, "OUTLINE")
@@ -264,30 +267,83 @@ for idx = 1, 6 do
         local nameFS = cell:CreateFontString(nil, "OVERLAY")
         nameFS:SetFont(FONT, 9, "OUTLINE")
         nameFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 25, yRow)
-        nameFS:SetWidth(74)
+        nameFS:SetWidth(84)
         nameFS:SetJustifyH("LEFT")
         nameFS:SetText("")
 
         local tierFS = cell:CreateFontString(nil, "OVERLAY")
         tierFS:SetFont(FONT, 9, "OUTLINE")
-        tierFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 102, yRow)
-        tierFS:SetWidth(CELL_W - 106)
+        tierFS:SetPoint("TOPLEFT", cell, "TOPLEFT", 112, yRow)
+        tierFS:SetWidth(114)
         tierFS:SetJustifyH("LEFT")
         tierFS:SetText("")
 
-        rows[r] = { nameFS = nameFS, lvlFS = lvlFS, tierFS = tierFS }
+        -- Row highlight texture
+        local highlight = cell:CreateTexture(nil, "ARTWORK")
+        highlight:SetPoint("TOPLEFT", cell, "TOPLEFT", 2, yRow)
+        highlight:SetSize(CELL_W - 6, ROW_H - 1)
+        highlight:SetTexture("Interface\\ChatFrame\\ChatFrameBackground")
+        highlight:SetVertexColor(0.78, 0.61, 0.23, 0.08)
+        highlight:Hide()
+
+        -- Transparent hover frame (full row width, behind removeBtn)
+        local rowBtn = CreateFrame("Button", nil, cell)
+        rowBtn:SetPoint("TOPLEFT", cell, "TOPLEFT", 2, yRow)
+        rowBtn:SetSize(CELL_W - 6, ROW_H)
+        rowBtn:SetFrameLevel(cell:GetFrameLevel() + 1)
+        rowBtn.active = false
+        rowBtn:SetScript("OnEnter", function(self)
+            if self.active then highlight:Show() end
+        end)
+        rowBtn:SetScript("OnLeave", function(self)
+            highlight:Hide()
+        end)
+
+        -- Remove button (×) — sits above rowBtn
+        local removeBtn = CreateFrame("Button", nil, cell)
+        removeBtn:SetSize(16, ROW_H)
+        removeBtn:SetPoint("TOPLEFT", cell, "TOPLEFT", 230, yRow)
+        removeBtn:SetFrameLevel(cell:GetFrameLevel() + 2)
+        removeBtn.charName = ""
+        local removeLbl = removeBtn:CreateFontString(nil, "OVERLAY")
+        removeLbl:SetFont(FONT, 9, "OUTLINE")
+        removeLbl:SetAllPoints(removeBtn)
+        removeLbl:SetJustifyH("CENTER")
+        removeLbl:SetTextColor(0.70, 0.20, 0.20)
+        removeLbl:SetText("×")
+        removeBtn.lbl = removeLbl
+        removeBtn:SetScript("OnClick", function(self)
+            if self.charName ~= "" then
+                LS.SendCmd("removechar " .. self.charName)
+            end
+        end)
+        removeBtn:SetScript("OnEnter", function(self)
+            self.lbl:SetTextColor(1.0, 0.4, 0.4)
+            if rowBtn.active then highlight:Show() end
+        end)
+        removeBtn:SetScript("OnLeave", function(self)
+            self.lbl:SetTextColor(0.70, 0.20, 0.20)
+            highlight:Hide()
+        end)
+        removeBtn:Hide()
+
+        rows[r] = { nameFS = nameFS, lvlFS = lvlFS, tierFS = tierFS, removeBtn = removeBtn, rowBtn = rowBtn, highlight = highlight }
     end
 
     cells[idx] = { frame = cell, hdrFS = hdrFS, rows = rows }
 end
 
--- ─── Separator + Refresh button ──────────────────────────────────────────────
+-- ─── Separator + Refresh button + status bar ─────────────────────────────────
 
 goldLine(GRID_END - 8)
 
+-- 5 equal slots across the panel (756px usable / 5 = 151px each)
+-- Slot centers: 89, 240, 391, 542, 693
+local statY = GRID_END - 22
+
 local refreshBtn = CreateFrame("Button", nil, panel)
 refreshBtn:SetSize(90, 22)
-refreshBtn:SetPoint("TOP", panel, "TOP", 0, GRID_END - 20)
+refreshBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 44, GRID_END - 17)  -- centered in slot 1
 refreshBtn:SetBackdrop(BD_CELL)
 refreshBtn:SetBackdropColor(0.10, 0.08, 0.02, 1)
 refreshBtn:SetBackdropBorderColor(BDR_R, BDR_G, BDR_B, 1.0)
@@ -308,6 +364,39 @@ refreshBtn:SetScript("OnClick", function()
     LS.SendCmd("status")
 end)
 
+-- Status displays — slots 2–5 (130px wide, CENTER justify; slot centers: 240, 391, 542, 693)
+local accountsFS = panel:CreateFontString(nil, "OVERLAY")
+accountsFS:SetFont(FONT, 10, "OUTLINE")
+accountsFS:SetPoint("TOPLEFT", panel, "TOPLEFT", 175, statY)    -- center 240
+accountsFS:SetWidth(130)
+accountsFS:SetJustifyH("CENTER")
+accountsFS:SetTextColor(0.70, 0.75, 0.85)
+accountsFS:SetText("Accounts: —")
+
+local totalCharsFS = panel:CreateFontString(nil, "OVERLAY")
+totalCharsFS:SetFont(FONT, 10, "OUTLINE")
+totalCharsFS:SetPoint("TOPLEFT", panel, "TOPLEFT", 326, statY)  -- center 391
+totalCharsFS:SetWidth(130)
+totalCharsFS:SetJustifyH("CENTER")
+totalCharsFS:SetTextColor(0.70, 0.75, 0.85)
+totalCharsFS:SetText("Characters: —")
+
+local levelSyncFS = panel:CreateFontString(nil, "OVERLAY")
+levelSyncFS:SetFont(FONT, 10, "OUTLINE")
+levelSyncFS:SetPoint("TOPLEFT", panel, "TOPLEFT", 477, statY)   -- center 542
+levelSyncFS:SetWidth(130)
+levelSyncFS:SetJustifyH("CENTER")
+levelSyncFS:SetTextColor(0.70, 0.75, 0.85)
+levelSyncFS:SetText("Level Sync: —")
+
+local ipSyncFS = panel:CreateFontString(nil, "OVERLAY")
+ipSyncFS:SetFont(FONT, 10, "OUTLINE")
+ipSyncFS:SetPoint("TOPLEFT", panel, "TOPLEFT", 628, statY)      -- center 693
+ipSyncFS:SetWidth(130)
+ipSyncFS:SetJustifyH("CENTER")
+ipSyncFS:SetTextColor(0.70, 0.75, 0.85)
+ipSyncFS:SetText("IP Sync: —")
+
 -- ─── Commands reference section ──────────────────────────────────────────────
 
 local CMD_TOP = GRID_END - 48
@@ -317,14 +406,14 @@ goldLine(CMD_TOP)
 local cmdHdr = panel:CreateFontString(nil, "OVERLAY")
 cmdHdr:SetFont(FONT, 10, "OUTLINE")
 cmdHdr:SetPoint("TOPLEFT", panel, "TOPLEFT", MARGIN, CMD_TOP - 6)
-cmdHdr:SetText(GOLD2.."Slash Commands"..ENDC)
+cmdHdr:SetText(GOLD2.."Commands"..ENDC)
 
 goldLine(CMD_TOP - 18)
 
--- 2 columns of 5; each entry = .levelsync line, /lsync line, description line
+-- 2 columns (6 left, 5 right)
 for i, entry in ipairs(CMDS) do
-    local col    = (i <= 5) and 0 or 1
-    local rowIdx = (i <= 5) and (i - 1) or (i - 6)
+    local col    = (i <= CMD_COL_SPLIT) and 0 or 1
+    local rowIdx = (i <= CMD_COL_SPLIT) and (i - 1) or (i - CMD_COL_SPLIT - 1)
     local xOff   = MARGIN + 2 + col * CMD_COL_W
     local yBase  = CMD_TOP - 26 - rowIdx * CMD_ENTRY_H
 
@@ -351,6 +440,21 @@ local function RebuildGrid()
     local d       = LS.data
     local myName  = UnitName("player") or ""
 
+    -- Status bar
+    if d.inGroup then
+        accountsFS:SetText("Accounts: " .. d.accountsCur .. "/" .. d.accountsMax)
+        totalCharsFS:SetText("Characters: " .. d.totalChars)
+        local lsOn = d.levelSync
+        levelSyncFS:SetText("Level Sync: " .. (lsOn and "|cff44dd44ON|r" or "|cffdd4444OFF|r"))
+        local ipOn = d.ipSync
+        ipSyncFS:SetText("IP Sync: "     .. (ipOn and "|cff44dd44ON|r" or "|cffdd4444OFF|r"))
+    else
+        accountsFS:SetText("Accounts: —")
+        totalCharsFS:SetText("Characters: —")
+        levelSyncFS:SetText("Level Sync: —")
+        ipSyncFS:SetText("IP Sync: —")
+    end
+
     -- Group members by accountId, preserving order of first appearance
     local accountOrder = {}
     local accountMap   = {}  -- accountId → {members}
@@ -368,16 +472,20 @@ local function RebuildGrid()
 
         if not accId then
             -- Empty cell
-            cell.hdrFS:SetTextColor(0.27, 0.27, 0.40)
+            cell.hdrFS:SetTextColor(0.35, 0.35, 0.50)
             cell.hdrFS:SetText("— empty —")
             cell.frame:SetBackdropBorderColor(CBDR_R, CBDR_G, CBDR_B, CBDR_A)
             for r = 1, SLOT_COUNT do
                 cell.rows[r].nameFS:SetText("")
                 cell.rows[r].lvlFS:SetText("")
                 cell.rows[r].tierFS:SetText("")
+                cell.rows[r].removeBtn.charName = ""
+                cell.rows[r].removeBtn:Hide()
+                cell.rows[r].rowBtn.active = false
+                cell.rows[r].highlight:Hide()
             end
         else
-            cell.hdrFS:SetTextColor(BDR_R * 0.9, BDR_G * 0.9, BDR_B * 0.9)
+            cell.hdrFS:SetTextColor(BDR_R, BDR_G, BDR_B)
             cell.hdrFS:SetText("Account " .. accId)
             cell.frame:SetBackdropBorderColor(BDR_R * 0.7, BDR_G * 0.7, BDR_B * 0.7, 0.9)
 
@@ -397,10 +505,17 @@ local function RebuildGrid()
                     local tc = TIER_COLORS[m.tierNum] or TIER_COLORS[0]
                     cell.rows[r].tierFS:SetTextColor(tc[1], tc[2], tc[3])
                     cell.rows[r].tierFS:SetText(TIER_SHORT[m.tierNum] or "None")
+                    cell.rows[r].removeBtn.charName = m.name
+                    cell.rows[r].removeBtn:Show()
+                    cell.rows[r].rowBtn.active = true
                 else
                     cell.rows[r].nameFS:SetText("")
                     cell.rows[r].lvlFS:SetText("")
                     cell.rows[r].tierFS:SetText("")
+                    cell.rows[r].removeBtn.charName = ""
+                    cell.rows[r].removeBtn:Hide()
+                    cell.rows[r].rowBtn.active = false
+                    cell.rows[r].highlight:Hide()
                 end
             end
         end
@@ -430,6 +545,7 @@ function LS.TogglePanel()
         panel:Hide()
     else
         panel:Show()
+        RebuildGrid()
         LS.SendCmd("status")
     end
 end
