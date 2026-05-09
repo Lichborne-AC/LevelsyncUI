@@ -6,6 +6,10 @@ A World of Warcraft addon (WotLK 3.3.5a, Azerothcore) that provides a graphical 
 
 LevelSync provides a graphical interface that lets you view your levelsync group directly from an in-game panel. It displays all accounts and characters in your sync group in a clean 3×2 grid, with levels, class (in colors), and IP tier progression.
 
+## Screenshot
+
+![LevelSyncUI](screenshot.png)
+
 ## Features
 
 - **3×2 account grid** — up to 6 accounts, 10 characters each
