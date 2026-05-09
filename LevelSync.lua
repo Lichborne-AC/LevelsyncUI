@@ -230,7 +230,7 @@ local function LevelSyncStatusFilter(_, _, msg)
         -- Untagged lines are pure status data (Accounts:, character rows, etc.) — suppress
         if not clean:find("%[LevelSync%]") then return true end
         -- Known status header lines that carry [LevelSync] — suppress
-        if clean:find("Sync Group #") or clean:find("Group members") then return true end
+        if clean:find("Sync Group #") or clean:find("Group members") or clean:find("graphical interface") then return true end
         -- Any other [LevelSync] message (confirmations, errors) — let through
         return
     end

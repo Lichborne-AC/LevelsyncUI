@@ -58,9 +58,9 @@ local CMDS = {
     { sub = "setkey <key>",              desc = "Set your account security key" },
     { sub = "addaccount <acct> [key]",   desc = "Link all characters from another account" },
     { sub = "addchar <name> [key]",      desc = "Link a single character into your group" },
-    { sub = "removeaccount <acct>",      desc = "Remove all characters of an account" },
-    { sub = "removeaccount # <acct#>",  desc = "Remove an account by its group number" },
     { sub = "removechar <name>",         desc = "Remove one character from your group" },
+    { sub = "removeaccount <acct>",      desc = "Remove all characters of an account" },
+    { sub = "removeaccount # <acct#>",  desc = "Remove an account by its account number" },
     { sub = "removeall",                 desc = "Disband your sync group" },
     { sub = "disbandaccount",            desc = "Disband all groups tied to your account" },
     { sub = "listaccount <acct> [key]",  desc = "List all characters on an account" },
@@ -74,7 +74,7 @@ local CMD_COLS     = 2
 local CMD_COL_W    = (PANEL_W - MARGIN * 2) / CMD_COLS  -- 306px each
 local CMD_COL_SPLIT = 6   -- entries 1-6 in left col, 7-11 in right col
 -- Panel height
-PANEL_H = 680
+PANEL_H = 706
 
 -- ─── Tier short display strings ─────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ end
 local panel = CreateFrame("Frame", "LevelSyncMainFrame", UIParent)
 panel:SetSize(PANEL_W, PANEL_H)
 panel:SetPoint("CENTER")
-panel:SetFrameStrata("DIALOG")
+panel:SetFrameStrata("FULLSCREEN_DIALOG")
 panel:SetMovable(true)
 panel:SetClampedToScreen(true)
 panel:EnableMouse(true)
@@ -152,8 +152,45 @@ panel:RegisterForDrag("LeftButton")
 panel:SetScript("OnDragStart", panel.StartMoving)
 panel:SetScript("OnDragStop",  panel.StopMovingOrSizing)
 panel:SetBackdrop(BD_MAIN)
-panel:SetBackdropColor(BG_R, BG_G, BG_B, BG_A)
+panel:SetBackdropColor(BG_R, BG_G, BG_B, 1.0)
 panel:SetBackdropBorderColor(BDR_R, BDR_G, BDR_B, BDR_A)
+
+-- Solid opaque fill — prevents other frames bleeding through the backdrop
+local panelBg = panel:CreateTexture(nil, "ARTWORK")
+panelBg:SetAllPoints(panel)
+panelBg:SetTexture(BG_R, BG_G, BG_B, 1.0)
+
+-- Gold border (2px lines on all 4 sides)
+local bTop = panel:CreateTexture(nil, "OVERLAY")
+bTop:SetTexture(BDR_R, BDR_G, BDR_B, 0.55)
+bTop:SetPoint("TOPLEFT",  panel, "TOPLEFT",  0, 0)
+bTop:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, 0)
+bTop:SetHeight(2)
+
+local bBot = panel:CreateTexture(nil, "OVERLAY")
+bBot:SetTexture(BDR_R, BDR_G, BDR_B, 0.55)
+bBot:SetPoint("BOTTOMLEFT",  panel, "BOTTOMLEFT",  0, 0)
+bBot:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, 0)
+bBot:SetHeight(2)
+
+local bLeft = panel:CreateTexture(nil, "OVERLAY")
+bLeft:SetTexture(BDR_R, BDR_G, BDR_B, 0.55)
+bLeft:SetPoint("TOPLEFT",    panel, "TOPLEFT",    0,  0)
+bLeft:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0,  0)
+bLeft:SetWidth(2)
+
+local bRight = panel:CreateTexture(nil, "OVERLAY")
+bRight:SetTexture(BDR_R, BDR_G, BDR_B, 0.55)
+bRight:SetPoint("TOPRIGHT",    panel, "TOPRIGHT",    0, 0)
+bRight:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, 0)
+bRight:SetWidth(2)
+
+-- OnShow: re-apply backdrop colors that can reset on window focus changes
+panel:SetScript("OnShow", function()
+    panel:SetBackdropColor(BG_R, BG_G, BG_B, 1.0)
+    panel:SetBackdropBorderColor(BDR_R, BDR_G, BDR_B, BDR_A)
+end)
+
 panel:Hide()
 
 -- Register with UISpecialFrames so ESC closes it
@@ -175,7 +212,7 @@ closeBtn:SetScript("OnClick", function() panel:Hide() end)
 
 -- Gold separator line helper
 local function goldLine(yAbs)
-    local t = panel:CreateTexture(nil, "ARTWORK")
+    local t = panel:CreateTexture(nil, "OVERLAY")
     t:SetHeight(1)
     t:SetPoint("TOPLEFT",  panel, "TOPLEFT",  MARGIN, yAbs)
     t:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -MARGIN, yAbs)
@@ -333,17 +370,35 @@ for idx = 1, 6 do
     cells[idx] = { frame = cell, hdrFS = hdrFS, rows = rows }
 end
 
+-- ─── Note (between grid and status bar) ──────────────────────────────────────
+
+local noteFS = panel:CreateFontString(nil, "OVERLAY")
+noteFS:SetFont(FONT, 9, "OUTLINE")
+noteFS:SetPoint("TOPLEFT",  panel, "TOPLEFT",  MARGIN, GRID_END - 5)
+noteFS:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -MARGIN, GRID_END - 5)
+noteFS:SetJustifyH("LEFT")
+noteFS:SetTextColor(0.60, 0.62, 0.70)
+noteFS:SetText("|cffd4af37Note:|r Level and XP sync applies on login, logout, and when toggled on. Offline members may not reflect the synced level until one of these conditions is met.")
+
+local noteFS2 = panel:CreateFontString(nil, "OVERLAY")
+noteFS2:SetFont(FONT, 9, "OUTLINE")
+noteFS2:SetPoint("TOPLEFT",  panel, "TOPLEFT",  MARGIN, GRID_END - 18)
+noteFS2:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -MARGIN, GRID_END - 18)
+noteFS2:SetJustifyH("LEFT")
+noteFS2:SetTextColor(0.60, 0.62, 0.70)
+noteFS2:SetText("|cffd4af37Note:|r Rested XP and class quest turn-ins can desync levels. To resync, toggle .levelsync level off then on, or relog all characters.")
+
 -- ─── Separator + Refresh button + status bar ─────────────────────────────────
 
-goldLine(GRID_END - 8)
+goldLine(GRID_END - 34)
 
 -- 5 equal slots across the panel (756px usable / 5 = 151px each)
 -- Slot centers: 89, 240, 391, 542, 693
-local statY = GRID_END - 22
+local statY = GRID_END - 48
 
 local refreshBtn = CreateFrame("Button", nil, panel)
 refreshBtn:SetSize(90, 22)
-refreshBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 44, GRID_END - 17)  -- centered in slot 1
+refreshBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 44, GRID_END - 43)  -- centered in slot 1
 refreshBtn:SetBackdrop(BD_CELL)
 refreshBtn:SetBackdropColor(0.10, 0.08, 0.02, 1)
 refreshBtn:SetBackdropBorderColor(BDR_R, BDR_G, BDR_B, 1.0)
@@ -399,7 +454,7 @@ ipSyncFS:SetText("IP Sync: —")
 
 -- ─── Commands reference section ──────────────────────────────────────────────
 
-local CMD_TOP = GRID_END - 48
+local CMD_TOP = GRID_END - 74
 
 goldLine(CMD_TOP)
 
@@ -437,13 +492,12 @@ end
 -- ─── RebuildGrid — called by UI_OnDataRefresh ─────────────────────────────────
 
 local function RebuildGrid()
-    local d       = LS.data
-    local myName  = UnitName("player") or ""
+    local d = LS.data
 
     -- Status bar
     if d.inGroup then
-        accountsFS:SetText("Accounts: " .. d.accountsCur .. "/" .. d.accountsMax)
-        totalCharsFS:SetText("Characters: " .. d.totalChars)
+        accountsFS:SetText("Accounts: " .. GOLD .. d.accountsCur .. "/" .. d.accountsMax .. ENDC)
+        totalCharsFS:SetText("Characters: " .. GOLD .. d.totalChars .. ENDC)
         local lsOn = d.levelSync
         levelSyncFS:SetText("Level Sync: " .. (lsOn and "|cff44dd44ON|r" or "|cffdd4444OFF|r"))
         local ipOn = d.ipSync
@@ -494,11 +548,7 @@ local function RebuildGrid()
                 local m = members[r]
                 if m then
                     local cr, cg, cb = hexRGB(LS.CLASS_COLORS[m.class])
-                    if m.name == myName then
-                        cell.rows[r].nameFS:SetTextColor(1.00, 0.90, 0.30)
-                    else
-                        cell.rows[r].nameFS:SetTextColor(cr, cg, cb)
-                    end
+                    cell.rows[r].nameFS:SetTextColor(cr, cg, cb)
                     cell.rows[r].nameFS:SetText(m.name)
                     cell.rows[r].lvlFS:SetTextColor(0.83, 0.69, 0.22)
                     cell.rows[r].lvlFS:SetText(tostring(m.level))
